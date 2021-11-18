@@ -11,15 +11,22 @@ from tkinter.filedialog import askopenfilename
 from tkinter.messagebox import showinfo
 from tkinter.messagebox import showerror
 
-# Get excel file location
-Tk().withdraw()
-showinfo(title="Message", message="Please select document index Excel file.")
-EXCEL = askopenfilename(filetypes=[("Excel files", "*.xlsx")])
+from openpyxl import descriptors
 
-# Get title page PDF file location
-Tk().withdraw()
-showinfo(title="Message", message="Please select blank title page PDF file.")
-PDF = askopenfilename(filetypes=[("PDF files", "*.pdf")])
+# # Get excel file location
+# Tk().withdraw()
+# showinfo(title="Message", message="Please select document index Excel file.")
+# EXCEL = askopenfilename(filetypes=[("Excel files", "*.xlsx")])
+
+# # Get title page PDF file location
+# Tk().withdraw()
+# showinfo(title="Message", message="Please select blank title page PDF file.")
+# PDF = askopenfilename(filetypes=[("PDF files", "*.pdf")])
+
+EXCEL = Path(
+    "F:\Engineering\Eli Saunders\Python\Python Certs\EXAMPLE_CertificateIndex.xlsx"
+)
+PDF = Path("F:\Engineering\Eli Saunders\Python\Python Certs\EXAMPLE - BlankPage.pdf")
 
 # Set working directory to excel file location
 WORKING = Path(EXCEL).parent.absolute()
@@ -86,47 +93,94 @@ for dir, _, _ in os.walk(PROJECT):
     files.extend(glob(os.path.join(dir, pattern)))
 
 ref = 1  # index for iterating through doc refs
+subref = 1
 refs = {}  # dictionary for storing values from index file
+
+HEADINGS = [
+    "Sequence",
+    "Level",
+    "Component",
+    "Description",
+    "Material Number",
+    "Heat Number",
+    "Certificate Number",
+    "GIN number",
+    "RAM Build Number",
+    "File Reference",
+]
 
 # iterate through index rows and assign values to dictionary
 for row in range(8, sheet.max_row + 1):
-    sect = sheet["A" + str(row)].value
+    seq = sheet["A" + str(row)].value
     lev = sheet["B" + str(row)].value
-    head = sheet["C" + str(row)].value
-    rev = sheet["D" + str(row)].value
-    fil = sheet["E" + str(row)].value
-    titl = sheet["F" + str(row)].value
-    tocs = sheet["G" + str(row)].value
+    comp = sheet["C" + str(row)].value
+    desc = sheet["D" + str(row)].value
+    mat = sheet["E" + str(row)].value
+    heat = sheet["F" + str(row)].value
+    cert = sheet["G" + str(row)].value
+    gin = sheet["H" + str(row)].value
+    build = sheet["I" + str(row)].value
+    fil = sheet["J" + str(row)].value
+    titl = sheet["K" + str(row)].value
+    tocs = sheet["L" + str(row)].value
 
-    if sect is None:  # break out of loop if all rows read
+    if comp is None:  # break out of loop if all rows read
         break
 
-    try:
-        refs.setdefault(
-            ref,
-            {
-                "sect": str(sect),
-                "lev": int(lev),
-                "head": head,
-                "rev": rev,
-                "fil": fil,
-                "titl": titl,
-                "tocs": tocs,
-            },
-        )
-    except:
-        logFile.write("\n**** Excel format incorrect ****\n")
-        showerror(title="Error", message="Excel format is incorrect.")
-        logFile.close()
-        sys.exit("Excel format incorrect")
+    sub = {}
 
-    ref = ref + 1
+    if lev == 1:
+        section = ref
+        try:
+            refs.setdefault(
+                ref,
+                {
+                    "lev": str(lev),
+                    "comp": str(comp),
+                    "desc": str(desc),
+                    "fil": str(fil),
+                    "sub": sub,
+                },
+            )
+        except:
+            logFile.write("\n**** Excel format incorrect ****\n")
+            showerror(title="Error", message="Excel format is incorrect.")
+            logFile.close()
+            sys.exit("Excel format incorrect")
+        ref = ref + 1
+        subref = 1
+    else:
+        try:
+            refs[section]["sub"].setdefault(
+                subref,
+                {
+                    "seq": str(seq),
+                    "lev": str(lev),
+                    "comp": str(comp),
+                    "desc": str(desc),
+                    "mat": str(mat),
+                    "heat": str(heat),
+                    "cert": str(cert),
+                    "gin": str(gin),
+                    "build": str(build),
+                    "fil": str(fil),
+                },
+            )
+        except:
+            logFile.write("\n**** Excel format incorrect ****\n")
+            showerror(title="Error", message="Excel format is incorrect.")
+            logFile.close()
+            sys.exit("Excel format incorrect")
+        subref = subref + 1
 
 # create list of file references to check for missing or duplciate references
 numbers = []
 for i in range(1, len(refs) + 1):
     if refs[i]["fil"] is not None:
         numbers.append(refs[i]["fil"])
+        for j in range(1, len(refs[i]["sub"]) + 1):
+            if refs[i]["sub"][j] is not None:
+                numbers.append(refs[i]["sub"][j]["fil"])
 
 # create lists for file refs to be used and catching errors
 duplicates = []
@@ -145,6 +199,7 @@ for i in numbers:
 
 # remove duplicate references from duplicates list
 duplicates = list(dict.fromkeys(duplicates))
+missing = list(dict.fromkeys(missing))
 
 # write duplicates to log file
 if len(duplicates) != 0:
@@ -167,28 +222,6 @@ if len(missing) != 0:
     showerror(title="Error", message="Missing file references.")
     sys.exit("ERROR - Missing references.")
 
-# check that table of contents levels can be written
-for i in range(1, (len(refs)) + 1):
-    if i == 1 and refs[i]["lev"] != 1:
-        # check that TOC levels start at 1
-        logFile.write("ERROR - Table of contents level does not start at 1.")
-        showerror(title="Error", message="Table of contents does not start at 1.")
-        sys.exit("ERROR - Table of contents level does not start at 1.")
-
-    # check that previous TOC level was higher or only jumped down 1
-    if i >= 2:
-        if (refs[i - 1]["lev"]) >= (refs[i]["lev"]) or (refs[i - 1]["lev"]) == (
-            refs[i]["lev"]
-        ) - 1:
-            pass
-        else:
-            logFile.write("ERROR - Table of contents level jumps down more than 1.")
-            showerror(
-                title="Error",
-                message="Table of contents level jumps down more than 1 level.",
-            )
-            sys.exit("ERROR - Table of contents level jumps down more than 1.")
-
 
 logFile.write("This is the table of contents (tab separated):\n\n")
 
@@ -203,20 +236,96 @@ tocRef = []
 
 fileerror = 0
 
+
+def table_entries(sub_index):
+    entry = []
+    for i in sub_index:
+        entry.append(list(map(str, sub_index[i].values())))
+    entry.append(HEADINGS)
+    entry = list(zip(*reversed(entry)))
+    entries = []
+    for i in entry:
+        entries.append("\n".join(i))
+    return entries
+
+
+collumn_x = [35, 0, 60, 115, 300, 360, 410, 460, 500, 550]
+
 # create section heading page when needed
-def title_page(section, title):
+def title_page(index):
     blankPage = fitz.open(WORKING / PDF)  # create object from blank pdf
     tempPage = blankPage[0]  # select page
-    p1 = fitz.Point(50, 400)  # set section heading position
-    t1 = f"Section {section}"  # section heading text
-    tempPage.insertText(p1, t1, fontsize=25, color=C_BLACK)  # add section geading text
-    p2 = fitz.Point(50, 450)  # set section title position
-    wrapper = textwrap.TextWrapper(width=30)  # wrap section title text
-    t2 = wrapper.wrap(text=title)
-    tempPage.insertText(p2, t2, fontsize=25, color=C_BLACK)  # add section title text
+    for i, j in enumerate(index):
+        if i == 1:
+            continue
+        p1 = fitz.Point(collumn_x[i], 400)  # set section heading position
+        t1 = str(j)  # section heading text
+        tempPage.insertText(p1, t1, fontsize=8, color=C_BLACK)
+
     return blankPage
 
 
+def file_insert(file_ref):
+    for i in files:
+        if file_ref.lower() in i.lower():
+            newPages = fitz.open(i)
+            return newPages
+
+
+def PDF_toc_entry(lev, heading, page):
+    entry = []
+    entry.append(lev)
+    if lev == 1:
+        entry.append(f"Assembly Number: {heading}")
+    if lev == 2:
+        entry.append(f"Certificate Number: {heading}")
+    entry.append(page)
+    return entry  # add bookmarks list
+
+
+for index in refs:
+    if index == 1:
+        entry_for_test = table_entries(refs[index]["sub"])
+        newDoc = title_page(entry_for_test)
+    else:
+        entry_for_test = table_entries(refs[index]["sub"])
+        test_page = title_page(entry_for_test)
+        newDoc.insertPDF(test_page)
+
+    if refs[index]["fil"] is not None:
+        tocPDF.append(PDF_toc_entry(1, refs[index]["comp"], len(newDoc) + 1))
+        newDoc.insertPDF(file_insert(refs[index]["fil"]))
+
+    cert_needed = []
+
+    for i in refs[index]["sub"]:
+        for j in refs[index]["sub"][i]:
+            if j == "fil":
+                cert_needed.append(refs[index]["sub"][i][j])
+
+    cert_needed = list(dict.fromkeys(cert_needed))
+
+    for i in cert_needed:
+        tocPDF.append(PDF_toc_entry(2, i, len(newDoc) + 1))
+        newDoc.insertPDF(file_insert(i))
+
+try:
+    newDoc.setToC(tocPDF)
+except:
+    logFile.write(
+        "\n**** Cannot write TOC to PDF, check you are not jumping down more than one level. ****\n"
+    )
+    tocerror = 1
+    showerror(
+        title="Error",
+        message="Cannot write TOC to PDF, check you are not jumping down more than one level.",
+    )
+
+newDoc.save(WORKING / OUTPUT, garbage=4, deflate=1)
+newDoc.close()
+
+"""
+    
 for index in refs:
     # build pdf bookmark table entry
     entry = []
@@ -326,3 +435,5 @@ except:
     )
 wb.close()
 logFile.close()
+
+"""
