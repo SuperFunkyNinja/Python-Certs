@@ -98,7 +98,7 @@ refs = {}  # dictionary for storing values from index file
 
 HEADINGS = [
     "Sequence",
-    "Level",
+    "Title",
     "Component",
     "Description",
     "Material Number",
@@ -112,7 +112,7 @@ HEADINGS = [
 # iterate through index rows and assign values to dictionary
 for row in range(8, sheet.max_row + 1):
     seq = sheet["A" + str(row)].value
-    lev = sheet["B" + str(row)].value
+    titl = sheet["B" + str(row)].value
     comp = sheet["C" + str(row)].value
     desc = sheet["D" + str(row)].value
     mat = sheet["E" + str(row)].value
@@ -121,21 +121,19 @@ for row in range(8, sheet.max_row + 1):
     gin = sheet["H" + str(row)].value
     build = sheet["I" + str(row)].value
     fil = sheet["J" + str(row)].value
-    titl = sheet["K" + str(row)].value
-    tocs = sheet["L" + str(row)].value
 
     if comp is None:  # break out of loop if all rows read
         break
 
     sub = {}
 
-    if lev == 1:
+    if "y" in str(titl).lower() or "x" in str(titl).lower():
         section = ref
         try:
             refs.setdefault(
                 ref,
                 {
-                    "lev": str(lev),
+                    "titl": str(titl),
                     "comp": str(comp),
                     "desc": str(desc),
                     "fil": str(fil),
@@ -155,7 +153,7 @@ for row in range(8, sheet.max_row + 1):
                 subref,
                 {
                     "seq": str(seq),
-                    "lev": str(lev),
+                    "titl": str(titl),
                     "comp": str(comp),
                     "desc": str(desc),
                     "mat": str(mat),
@@ -175,16 +173,25 @@ for row in range(8, sheet.max_row + 1):
 
 # create list of file references to check for missing or duplciate references
 numbers = []
+# for i in range(1, len(refs) + 1):
+#     if refs[i]["fil"] != "None":
+#         numbers.append(refs[i]["fil"])
+#         for j in range(1, len(refs[i]["sub"]) + 1):
+#             if refs[i]["sub"][j]["fil"] != "None":
+#                 numbers.append(refs[i]["sub"][j]["fil"])
+
 for i in range(1, len(refs) + 1):
     if refs[i]["fil"] is not None:
         numbers.append(refs[i]["fil"])
         for j in range(1, len(refs[i]["sub"]) + 1):
-            if refs[i]["sub"][j] is not None:
+            if refs[i]["sub"][j]["fil"] is not None:
                 numbers.append(refs[i]["sub"][j]["fil"])
 
 # create lists for file refs to be used and catching errors
 duplicates = []
 missing = []
+
+numbers = [x for x in numbers if x != "None"]
 
 # check for unique references to be used going forward, and store missing refs and refs that can refer to multiple files
 for i in numbers:
@@ -278,7 +285,7 @@ def PDF_toc_entry(lev, heading, page):
     if lev == 1:
         entry.append(f"Assembly Number: {heading}")
     if lev == 2:
-        entry.append(f"Certificate Number: {heading}")
+        entry.append(f"GIN Number: {heading}")
     entry.append(page)
     return entry  # add bookmarks list
 
@@ -287,13 +294,15 @@ for index in refs:
     if index == 1:
         entry_for_test = table_entries(refs[index]["sub"])
         newDoc = title_page(entry_for_test)
+        tocPDF.append(PDF_toc_entry(1, refs[index]["comp"], len(newDoc)))
     else:
         entry_for_test = table_entries(refs[index]["sub"])
         test_page = title_page(entry_for_test)
+        tocPDF.append(PDF_toc_entry(1, refs[index]["comp"], len(newDoc) + 1))
         newDoc.insertPDF(test_page)
 
-    if refs[index]["fil"] is not None:
-        tocPDF.append(PDF_toc_entry(1, refs[index]["comp"], len(newDoc) + 1))
+    if refs[index]["fil"] != "None":
+        # tocPDF.append(PDF_toc_entry(1, refs[index]["comp"], len(newDoc) + 1))
         newDoc.insertPDF(file_insert(refs[index]["fil"]))
 
     cert_needed = []
