@@ -27,6 +27,9 @@ EXCEL = Path(
     "F:\Engineering\Eli Saunders\Python\Python Certs\EXAMPLE_CertificateIndex.xlsx"
 )
 PDF = Path("F:\Engineering\Eli Saunders\Python\Python Certs\EXAMPLE - BlankPage.pdf")
+WATERMARK = fitz.open(
+    Path("F:\Engineering\Eli Saunders\Python\Python Certs\WATERMARK.pdf")
+)
 
 # Set working directory to excel file location
 WORKING = Path(EXCEL).parent.absolute()
@@ -290,6 +293,32 @@ def PDF_toc_entry(lev, heading, page):
     return entry  # add bookmarks list
 
 
+def PDF_watermark(workingPDF, text):
+    part = text["comp"]
+    gin = "GN" + text["gin"]
+    build = text["build"]
+    p1 = fitz.Point(25, 16)
+    p2 = fitz.Point(125, 16)
+    p3 = fitz.Point(225, 16)
+    print(part, gin, build)
+    for page in workingPDF:
+        place = fitz.Rect(0.0, 0.0, 595.0, 841.0)
+        page.insertText(p1, part, fontsize=16, color=C_RED)
+        page.insertText(p2, gin, fontsize=16, color=C_RED)
+        page.insertText(p3, build, fontsize=16, color=C_RED)
+        page.show_pdf_page(
+            place,
+            WATERMARK,
+            pno=0,
+            clip=None,
+            rotate=0,
+            oc=0,
+            keep_proportion=True,
+            overlay=True,
+        )
+    return workingPDF
+
+
 for index in refs:
     if index == 1:
         entry_for_test = table_entries(refs[index]["sub"])
@@ -306,17 +335,25 @@ for index in refs:
         newDoc.insertPDF(file_insert(refs[index]["fil"]))
 
     cert_needed = []
+    cert_needed2 = []
 
     for i in refs[index]["sub"]:
-        for j in refs[index]["sub"][i]:
-            if j == "fil":
-                cert_needed.append(refs[index]["sub"][i][j])
+        cert_needed.append(refs[index]["sub"][i]["fil"])
+
+    for i in refs[index]["sub"]:
+        cert_needed2.append(refs[index]["sub"][i])
 
     cert_needed = list(dict.fromkeys(cert_needed))
 
-    for i in cert_needed:
+    # for i in cert_needed:
+    #     tocPDF.append(PDF_toc_entry(2, i, len(newDoc) + 1))
+    #     newCert = file_insert(i)
+    #     newDoc.insertPDF(PDF_watermark(newCert))
+
+    for i in cert_needed2:
         tocPDF.append(PDF_toc_entry(2, i, len(newDoc) + 1))
-        newDoc.insertPDF(file_insert(i))
+        newCert = file_insert(i["fil"])
+        newDoc.insertPDF(PDF_watermark(newCert, i))
 
 try:
     newDoc.setToC(tocPDF)
